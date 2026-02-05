@@ -1,0 +1,10 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./internals/db/query.sql"
+    schema: "./internals/db/schema.sql"
+    gen:
+      go:
+        package: "dbmodel"
+        out: "dbmodel"
+        emit_json_tags: true
