@@ -73,7 +73,6 @@ services:
       - "3000:3000"
     env_file:
       - .env
-    # 🔥 THIS IS THE IMPORTANT PART
     volumes:
       - ./internals/config/noteon_back.json:/app/internals/config/noteon_back.json:ro
 
