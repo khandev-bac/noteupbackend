@@ -540,12 +540,21 @@ func (q *Queries) GoogleAuth(ctx context.Context, arg GoogleAuthParams) (GoogleA
 const searchNotes = `-- name: SearchNotes :many
 SELECT id, user_id, audio_url, audio_duration_seconds, audio_file_size_mb, transcript, title, word_count, status, search_vector, created_at, updated_at
 FROM notes
-WHERE search_vector @@ plainto_tsquery('english',$1)
-ORDER BY ts_rank(search_vector,plainto_tsquery('english',$1)) DESC
+WHERE user_id = $1
+    AND search_vector @@ plainto_tsquery('english', $2)
+ORDER BY ts_rank(
+search_vector,
+plainto_tsquery('english', $2)
+) DESC
 `
 
-func (q *Queries) SearchNotes(ctx context.Context, plaintoTsquery string) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, searchNotes, plaintoTsquery)
+type SearchNotesParams struct {
+	UserID         uuid.UUID `json:"user_id"`
+	PlaintoTsquery string    `json:"plainto_tsquery"`
+}
+
+func (q *Queries) SearchNotes(ctx context.Context, arg SearchNotesParams) ([]Note, error) {
+	rows, err := q.db.QueryContext(ctx, searchNotes, arg.UserID, arg.PlaintoTsquery)
 	if err != nil {
 		return nil, err
 	}

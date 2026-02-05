@@ -1,17 +1,18 @@
 package handler
 
 import (
+	middlewareV1 "go-servie/internals/middleware"
 	"go-servie/utils"
 	"net/http"
 	"strings"
 )
 
 func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
-	// userId, err := middleware.ExtractUser(r)
-	// if err != nil {
-	// 	utils.WriteJsonError(w, "Unauthorized", http.StatusUnauthorized, err)
-	// 	return
-	// }
+	userId, err := middlewareV1.ExtractUser(r)
+	if err != nil {
+		utils.WriteJsonError(w, "Unauthorized", http.StatusUnauthorized, err)
+		return
+	}
 	ctx := r.Context()
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	query = strings.ToLower(query)
@@ -19,7 +20,7 @@ func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteJsonError(w, "Missing query", http.StatusBadRequest, nil)
 		return
 	}
-	note, err := h.service.SearchService(ctx, query)
+	note, err := h.service.SearchService(ctx, userId.UserId, query)
 	if err != nil {
 		utils.WriteJsonError(w, "Something went wrong in search", http.StatusBadRequest, nil)
 

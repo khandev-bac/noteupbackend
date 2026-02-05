@@ -92,8 +92,13 @@ WHERE id = $1
 -- name: SearchNotes :many
 SELECT *
 FROM notes
-WHERE search_vector @@ plainto_tsquery('english',$1)
-ORDER BY ts_rank(search_vector,plainto_tsquery('english',$1)) DESC;
+WHERE user_id = $1
+    AND search_vector @@ plainto_tsquery('english', $2)
+ORDER BY ts_rank(
+search_vector,
+plainto_tsquery('english', $2)
+) DESC;
+
 
 -- name: GetUserCoinBalance :one
 SELECT balance
