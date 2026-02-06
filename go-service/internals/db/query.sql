@@ -90,14 +90,15 @@ WHERE id = $1
 
 
 -- name: SearchNotes :many
-SELECT *
-FROM notes
-WHERE user_id = $1
-    AND search_vector @@ plainto_tsquery('english', $2)
-ORDER BY ts_rank(
-search_vector,
-plainto_tsquery('english', $2)
-) DESC;
+WITH q AS (
+  SELECT plainto_tsquery('english', $1) AS query
+)
+SELECT n.*
+FROM notes n, q
+WHERE n.user_id = $2
+  AND n.search_vector @@ q.query
+ORDER BY ts_rank(n.search_vector, q.query) DESC;
+
 
 
 -- name: GetUserCoinBalance :one
@@ -170,3 +171,43 @@ SELECT
 FROM coin_transactions
 WHERE user_id = $1
 ORDER BY created_at DESC;
+
+
+
+
+
+-- name: CreateTask :one
+INSERT INTO tasks (user_id, title, description, priority, due_at)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: GetUserTasks :many
+SELECT * FROM tasks
+WHERE user_id = $1
+ORDER BY
+    CASE priority
+        WHEN 'high' THEN 1
+        WHEN 'medium' THEN 2
+        WHEN 'low' THEN 3
+    END,
+    due_at NULLS LAST,
+    created_at DESC;
+
+-- name: GetTaskById :one
+SELECT * FROM tasks
+WHERE id = $1 AND user_id = $2;
+
+-- name: UpdateTask :one
+UPDATE tasks
+SET
+    title = $3,
+    description = $4,
+    priority = $5,
+    status = $6,
+    due_at = $7
+WHERE id = $1 AND user_id = $2
+RETURNING *;
+
+-- name: DeleteTask :exec
+DELETE FROM tasks
+WHERE id = $1 AND user_id = $2;

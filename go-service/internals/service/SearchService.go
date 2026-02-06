@@ -7,6 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func (searchservice *Service) SearchService(ctx context.Context, userId uuid.UUID, query string) ([]dbmodel.Note, error) {
-	return searchservice.repo.SearchRepo(ctx, userId, query)
+func (searchservice *Service) SearchService(ctx context.Context, query string, userId uuid.UUID) ([]dbmodel.Note, error) {
+	return searchservice.repo.SearchRepo(ctx, query, userId)
 }

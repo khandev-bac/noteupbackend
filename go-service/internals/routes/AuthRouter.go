@@ -41,6 +41,16 @@ func V1Router(handler *handler.Handler) http.Handler {
 		r.Route("/coin_packs", func(coins chi.Router) {
 			coins.Get("/", handler.GetCoinPacksHandler)
 		})
+		r.Route("/tasks", func(task chi.Router) {
+			task.Use(middlewareV1.AuthMiddleware)
+			task.Post("/", handler.CreateTaskHandler)
+			task.Get("/", handler.GetUserTasksHandler)
+			task.Get("/{taskId}", handler.GetTaskByIdHandler)
+			task.Put("/{taskId}", handler.UpdateTaskHandler)
+			task.Patch("/{taskId}/complete", handler.CompleteTaskHandler)
+			task.Delete("/{taskId}", handler.DeleteTaskHandler)
+		})
+
 	})
 	return r
 }

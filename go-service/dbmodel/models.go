@@ -67,6 +67,19 @@ type Subscription struct {
 	UpdatedAt               time.Time      `json:"updated_at"`
 }
 
+type Task struct {
+	ID          uuid.UUID      `json:"id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Title       string         `json:"title"`
+	Description sql.NullString `json:"description"`
+	Status      string         `json:"status"`
+	Priority    string         `json:"priority"`
+	DueAt       sql.NullTime   `json:"due_at"`
+	CompletedAt sql.NullTime   `json:"completed_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
 type User struct {
 	ID         uuid.UUID      `json:"id"`
 	Email      string         `json:"email"`

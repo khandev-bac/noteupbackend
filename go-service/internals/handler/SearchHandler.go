@@ -8,23 +8,27 @@ import (
 )
 
 func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
-	userId, err := middlewareV1.ExtractUser(r)
+	user, err := middlewareV1.ExtractUser(r)
 	if err != nil {
 		utils.WriteJsonError(w, "Unauthorized", http.StatusUnauthorized, err)
 		return
 	}
+
 	ctx := r.Context()
+
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	query = strings.ToLower(query)
 	if query == "" {
 		utils.WriteJsonError(w, "Missing query", http.StatusBadRequest, nil)
 		return
 	}
-	note, err := h.service.SearchService(ctx, userId.UserId, query)
-	if err != nil {
-		utils.WriteJsonError(w, "Something went wrong in search", http.StatusBadRequest, nil)
 
+	note, err := h.service.SearchService(ctx, query, user.UserId)
+	if err != nil {
+		utils.WriteJsonError(w, "Something went wrong in search", http.StatusBadRequest, err)
+		return
 	}
+
 	var result []utils.NoteRes
 	for _, v := range note {
 		result = append(result, utils.NoteRes{
@@ -38,5 +42,6 @@ func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:            v.CreatedAt,
 		})
 	}
+
 	utils.WriteJsonESuccess(w, "fetched", http.StatusOK, result)
 }

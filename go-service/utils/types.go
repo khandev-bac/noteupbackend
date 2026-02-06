@@ -106,3 +106,16 @@ type Coins struct {
 	Price   int       `json:"coin_price"`
 	Popular bool      `json:"popular"`
 }
+
+type TaskRes struct {
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description,omitempty"`
+	Status      string    `json:"status"`
+	Priority    string    `json:"priority"`
+	DueAt       time.Time `json:"due_at,omitempty"`
+	CompletedAt time.Time `json:"completed_at,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}

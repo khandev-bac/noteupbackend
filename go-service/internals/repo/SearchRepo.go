@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 )
 
-func (searchrepo *Repo) SearchRepo(ctx context.Context, userId uuid.UUID, query string) ([]dbmodel.Note, error) {
+func (searchrepo *Repo) SearchRepo(ctx context.Context, query string, userId uuid.UUID) ([]dbmodel.Note, error) {
 	return searchrepo.db.SearchNotes(ctx, dbmodel.SearchNotesParams{
-		UserID:         userId,
 		PlaintoTsquery: query,
+		UserID:         userId,
 	})
 }

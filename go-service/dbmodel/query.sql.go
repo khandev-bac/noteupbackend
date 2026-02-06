@@ -147,6 +147,44 @@ func (q *Queries) CreateNotes(ctx context.Context, arg CreateNotesParams) (Note,
 	return i, err
 }
 
+const createTask = `-- name: CreateTask :one
+INSERT INTO tasks (user_id, title, description, priority, due_at)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, title, description, status, priority, due_at, completed_at, created_at, updated_at
+`
+
+type CreateTaskParams struct {
+	UserID      uuid.UUID      `json:"user_id"`
+	Title       string         `json:"title"`
+	Description sql.NullString `json:"description"`
+	Priority    string         `json:"priority"`
+	DueAt       sql.NullTime   `json:"due_at"`
+}
+
+func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
+	row := q.db.QueryRowContext(ctx, createTask,
+		arg.UserID,
+		arg.Title,
+		arg.Description,
+		arg.Priority,
+		arg.DueAt,
+	)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.Priority,
+		&i.DueAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUserCoins = `-- name: CreateUserCoins :exec
 INSERT INTO user_coin (user_id, balance)
 VALUES ($1, $2)
@@ -193,6 +231,21 @@ type DeleteNoteByIdParams struct {
 
 func (q *Queries) DeleteNoteById(ctx context.Context, arg DeleteNoteByIdParams) error {
 	_, err := q.db.ExecContext(ctx, deleteNoteById, arg.ID, arg.UserID)
+	return err
+}
+
+const deleteTask = `-- name: DeleteTask :exec
+DELETE FROM tasks
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteTaskParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTask, arg.ID, arg.UserID)
 	return err
 }
 
@@ -329,6 +382,34 @@ func (q *Queries) GetNoteByNoteId(ctx context.Context, arg GetNoteByNoteIdParams
 		&i.WordCount,
 		&i.Status,
 		&i.SearchVector,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getTaskById = `-- name: GetTaskById :one
+SELECT id, user_id, title, description, status, priority, due_at, completed_at, created_at, updated_at FROM tasks
+WHERE id = $1 AND user_id = $2
+`
+
+type GetTaskByIdParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetTaskById(ctx context.Context, arg GetTaskByIdParams) (Task, error) {
+	row := q.db.QueryRowContext(ctx, getTaskById, arg.ID, arg.UserID)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.Priority,
+		&i.DueAt,
+		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -494,6 +575,53 @@ func (q *Queries) GetUserCoins(ctx context.Context, userID uuid.UUID) (UserCoin,
 	return i, err
 }
 
+const getUserTasks = `-- name: GetUserTasks :many
+SELECT id, user_id, title, description, status, priority, due_at, completed_at, created_at, updated_at FROM tasks
+WHERE user_id = $1
+ORDER BY
+    CASE priority
+        WHEN 'high' THEN 1
+        WHEN 'medium' THEN 2
+        WHEN 'low' THEN 3
+    END,
+    due_at NULLS LAST,
+    created_at DESC
+`
+
+func (q *Queries) GetUserTasks(ctx context.Context, userID uuid.UUID) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, getUserTasks, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Task
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.Description,
+			&i.Status,
+			&i.Priority,
+			&i.DueAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const googleAuth = `-- name: GoogleAuth :one
 INSERT INTO users (email, google_id,picture,user_device)
 VALUES ($1, $2,$3, $4)
@@ -538,23 +666,23 @@ func (q *Queries) GoogleAuth(ctx context.Context, arg GoogleAuthParams) (GoogleA
 }
 
 const searchNotes = `-- name: SearchNotes :many
-SELECT id, user_id, audio_url, audio_duration_seconds, audio_file_size_mb, transcript, title, word_count, status, search_vector, created_at, updated_at
-FROM notes
-WHERE user_id = $1
-    AND search_vector @@ plainto_tsquery('english', $2)
-ORDER BY ts_rank(
-search_vector,
-plainto_tsquery('english', $2)
-) DESC
+WITH q AS (
+  SELECT plainto_tsquery('english', $1) AS query
+)
+SELECT n.id, n.user_id, n.audio_url, n.audio_duration_seconds, n.audio_file_size_mb, n.transcript, n.title, n.word_count, n.status, n.search_vector, n.created_at, n.updated_at
+FROM notes n, q
+WHERE n.user_id = $2
+  AND n.search_vector @@ q.query
+ORDER BY ts_rank(n.search_vector, q.query) DESC
 `
 
 type SearchNotesParams struct {
-	UserID         uuid.UUID `json:"user_id"`
 	PlaintoTsquery string    `json:"plainto_tsquery"`
+	UserID         uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) SearchNotes(ctx context.Context, arg SearchNotesParams) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, searchNotes, arg.UserID, arg.PlaintoTsquery)
+	rows, err := q.db.QueryContext(ctx, searchNotes, arg.PlaintoTsquery, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -652,6 +780,54 @@ func (q *Queries) UpdateNoteWithNoteId(ctx context.Context, arg UpdateNoteWithNo
 		&i.WordCount,
 		&i.Status,
 		&i.SearchVector,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateTask = `-- name: UpdateTask :one
+UPDATE tasks
+SET
+    title = $3,
+    description = $4,
+    priority = $5,
+    status = $6,
+    due_at = $7
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, title, description, status, priority, due_at, completed_at, created_at, updated_at
+`
+
+type UpdateTaskParams struct {
+	ID          uuid.UUID      `json:"id"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Title       string         `json:"title"`
+	Description sql.NullString `json:"description"`
+	Priority    string         `json:"priority"`
+	Status      string         `json:"status"`
+	DueAt       sql.NullTime   `json:"due_at"`
+}
+
+func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
+	row := q.db.QueryRowContext(ctx, updateTask,
+		arg.ID,
+		arg.UserID,
+		arg.Title,
+		arg.Description,
+		arg.Priority,
+		arg.Status,
+		arg.DueAt,
+	)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.Priority,
+		&i.DueAt,
+		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
